@@ -16,6 +16,13 @@ function update_helper_script() {
   echo -e "Info: Updating Creality Helper Script..."
   cd "${HELPER_SCRIPT_FOLDER}"
   git reset --hard && git pull
+  # Check if the latest commit is signed
+  # If not, roll back the changes and exit with an error message
+  if ! git log -1 --pretty=format:'%G?' | grep -q "G"; then
+    echo -e "${red}Error: No valid signature found in the latest commit. Rolling back changes.${white}"
+    git reset --hard HEAD@{1}
+    exit 1
+  fi
   ok_msg "Creality Helper Script has been updated!"
   echo -e "   ${green}Please restart script to load the new version.${white}"
   echo
@@ -28,6 +35,11 @@ function update_available() {
   cd "${HELPER_SCRIPT_FOLDER}"
   ! git branch -a | grep -q "\* main" && return
   git fetch -q > /dev/null 2>&1
+  # Check if the latest fetched commit is signed (we don't accept an unsigned commit)
+  if ! git log FETCH_HEAD -1 --pretty=format:'%G?' | grep -q "G"; then
+    echo "unsigned"
+    return
+  fi
   remote=$(git rev-parse --short=8 FETCH_HEAD)
   current=$(git rev-parse --short=8 HEAD)
   if [[ ${remote} != "${current}" ]]; then
@@ -65,6 +77,11 @@ function update_menu() {
           error_msg "Please select a correct choice!";;
       esac
     done
+  elif [[ "$update_available" == "unsigned" ]]; then
+    echo -e "${red}Error: No valid signature found in the latest fetched commit.${white}"
+    echo "The update will not be applied."
+    echo "Please check the repository for any issues."
+    echo "If you are sure that the update is safe, you can manually update it."
   fi
 }
 
